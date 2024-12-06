@@ -1,0 +1,39 @@
+---
+title: "Risultati test di Kolmogorv/Smirnov sui dataset Uniform"
+output: 
+  pdf_document:
+    toc: false
+    number_sections: true
+documentclass: article
+classoption: landscape
+geometry: "left=3cm,right=3cm,top=2cm,bottom=2cm"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=4-len=200000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=4-len=2000000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=6-len=200000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=6-len=2000000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=8-len=200000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=8-len=2000000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=10-len=200000.png')
+```
+```{r echo=FALSE, out.width='100%'}
+knitr::include_graphics('imgs/Kolmogorov-k=10-len=2000000.png')
+```
+
