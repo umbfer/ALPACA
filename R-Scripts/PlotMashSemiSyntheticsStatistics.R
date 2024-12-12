@@ -2,6 +2,8 @@ library(DescTools)
 library(dplyr)
 library(ggplot2)
 library(hrbrthemes)
+library(r2r)
+library(stringr)
 
 
 
@@ -9,47 +11,65 @@ library(hrbrthemes)
 
 # Plot experiment results for real genome sequences compared against the same sequence artificially modified
 
-
 ###### OPTIONS
-###### CODE
-plot_labeller <- function(variable, value){
-  # cat(sprintf("variable: <%s>, value: <%s>\n", variable, as.character(value)))
-  if (variable == 'kv') {
-    # N.B. kv e' un factor
-    return(sprintf("k = %s", as.character(value)))
-  } else if (variable == 'k') {
-    return(sprintf("k = %d", value))
-  }  else if (variable == 'lenFac') {
-    # lenFac è un factor
-    return(formatC(as.numeric(as.character(value)), format="f", digits=0, big.mark="."))
-  }else {
-    return(as.character(value))
-  }
-}
-
 ###### CODE
 
 # Sets the path of the directory containing the outputs of the experiments
-bs <- "uniform"
-wd <- sprintf("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent/%s,32", bs)
-setwd(wd)
+#bs <- "uniform"
+#wd <- sprintf("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent/%s,32", bs)
+#setwd(wd)
 
-dirname <- "ReportMashSynthetics"
-df1Filename <- "ReportMashSynthetics/distancesAll.RDS"
+dirname <- "Datasets2"
+df1Filename <- "Datasets2/distancesAll.RDS"
 
 similarities <- c('D2')
 
 # misure di riferimento
-sortedMeasures <- c("Jaccard", "Mash.Distance.1000.", "Mash.Distance.10000.", "Mash.Distance.100000.")
-pltMeasures <- c("Jaccard", "Mash.Distance.1000.", "Mash.Distance.10000.", "Mash.Distance.100000.")
-sortedMeasures <- c("Jaccard", "Mash.Distance.10000.")
-pltMeasures <- c("Jaccard", "Mash.Distance.10000.")
+
+# sortedMeasures <- c("Jaccard", "Mash.Distance.1000.", "Mash.Distance.10000.", "Mash.Distance.100000.")
+# pltMeasures <- c("Jaccard", "Mash.Distance.1000.", "Mash.Distance.10000.", "Mash.Distance.100000.")
+sortedMeasures <- c("D2", "Euclidean", "Antidice", "Dice", "Jaccard", "Kulczynski", "Ochiai", "Russel",
+                    "Hamman", "Hamming", "Matching", "Sneath", "Tanimoto")
+pltMeasures <- c("D2", "Euclidean", "Antidice", "Dice", "Jaccard", "Kulczynski", "Ochiai", "Russel",
+                 "Hamman", "Hamming", "Matching", "Sneath", "Tanimoto")
+
+
+# modifica i fattori di scala per ciascuna riga del pannello
+TranslationTable  <- hashmap(default = 0)
+TranslationTable[["Mash.Distance.1000."]] <- "Mash (sketch=1.000)"
+TranslationTable[["Mash.Distance.10000."]] <- "Mash (sketch=10.000)"
+TranslationTable[["Mash.Distance.100000."]] <- "Mash (sketch=10.0000)"
+
+
+TerminologyServer <- function( key) {
+  v <- TranslationTable[[key]]
+  return( if (v == 0) key else v)
+}
+
+MeasureLabeller <- function(keys) {
+  values <- c()
+  for(k in keys) {
+    values <- c(values, TerminologyServer(k))
+  }
+  return( values)
+}
+
+GammaLabeller <- function(keys) {
+  values <- c()
+  for(k in keys) {
+    values <- c(values, sprintf("G:%.2f", as.numeric(k)))
+  }
+  return( values)
+}
+
 
 # Defines the name of the file containing a copy of the dataframe created by this script
 #  Yeast, CElegans, HomoSapiens, Schistosoma, Lemur, MacacaMulatta, PiceaAbies
 # genomes <- c( "Yeast", "CElegans", "HomoSapiens", "Schistosoma", "Lemur", "MacacaMulatta", "PiceaAbies")
-genomes <- c( "Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
-sortedGenomes <- c("Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
+genomes <- c( "Yeast", "CElegans", "HomoSapiens")
+sortedGenomes <- c("Yeast", "CElegans", "HomoSapiens")
+genomes <- c( "fish")
+sortedGenomes <- c( "fish")
 
 tgtDF <- data.frame( Genome = character(), Measure = character(), Theta = integer(), k = integer(),
                      A = numeric(), B = numeric(), C = numeric(), D = numeric(), N = numeric(), density = numeric(),
@@ -65,8 +85,8 @@ if (!file.exists(df1Filename)) {
   cnt <- 0
   for( sequenceName in genomes) {
 
-    dfFilename <- sprintf( "Synthetics-DatiEsperimento/Report%s.RDS", sequenceName)
-    csvFilename <- sprintf("Synthetics-DatiEsperimento/%s.csv", sequenceName)
+    dfFilename <- sprintf( "%s/Report%s.RDS", dirname, sequenceName)
+    csvFilename <- sprintf("%s/%s.csv", dirname, sequenceName)
 
     if (!dir.exists(dirname)) {
       dir.create(dirname)
@@ -74,9 +94,9 @@ if (!file.exists(df1Filename)) {
 
     if (!file.exists(dfFilename)) {
       # carica il CSV dell'esperimento
-      columnClasses = c(
+      columnClasses <- c(
         #   sequenceA  sequenceB  start.time  real.time    Theta        k
-        "character", "character", "numeric", "numeric", "integer", "integer",
+        "character", "character", "numeric", "numeric", "numeric", "integer",
         #   A	        B	      C	         D	        N         A/N
         "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
         # 15 x misure present absent
@@ -84,8 +104,8 @@ if (!file.exists(df1Filename)) {
         "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
         # Matching	 Ochiai	     Phi	     Russel	   Sneath    	Tanimoto	  Yule
         "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
-        # mash 4 x 1 (P value, Mash distance, A, N size = 10.000)
-        "numeric", "numeric", "numeric", "numeric",
+        # mash 4 x 3 (P value, Mash distance, A, N size = 10.000)
+        "numeric", "numeric", "numeric", "numeric","numeric", "numeric", "numeric", "numeric","numeric", "numeric", "numeric", "numeric",
         # D2     Euclidean    Euclid_norm
         "numeric", "numeric", "numeric",
         # NKeysA   totalCntA   deltaA       HkA      errorA
@@ -103,7 +123,7 @@ if (!file.exists(df1Filename)) {
     # $ sequenceB           : Factor w/ 6 levels "GCF_003339765.1_Mmul_1.0-10",..: 3 1 2 4 5 6 3 1 2 4 ...
     # $ start.time          : int  1702206937 1702236286 1702268144 1702300312 1702338382 1702370789 1702207380 1702236826 1702268569 1702300989 ...
     # $ real.time           : Factor w/ 48 levels "222,4092066",..: 17 23 14 30 38 29 4 12 5 21 ...
-    # $ Theta               : int  5 10 20 80 90 95 5 10 20 80 ...
+    # $ Theta               : num  5 10 20 80 90 95 5 10 20 80 ...
     # $ k                   : int  4 4 4 4 4 4 8 8 8 8 ...
     # $ A                   : Factor w/ 33 levels "0","103","108.466.454",..: 13 13 13 13 13 13 25 25 25 25 ...
     # $ B                   : Factor w/ 31 levels "0","1.390.399.430",..: 1 1 1 1 1 1 1 1 1 1 ...
@@ -126,10 +146,18 @@ if (!file.exists(df1Filename)) {
     # $ Sneath              : Factor w/ 27 levels "0","0,001368653",..: 1 1 1 1 1 1 1 1 1 1 ...
     # $ Tanimoto            : Factor w/ 28 levels "0","0,005452227",..: 1 1 1 1 1 1 1 1 1 1 ...
     # $ Yule                : Factor w/ 31 levels "0","0,000340283",..: 24 24 24 24 24 24 24 24 24 24 ...
+    # $ Mash.Pv..1000.     : Factor w/ 25 levels "0","0,0148949",..: 1 1 1 1 1 1 1 1 1 1 ...
+    # $ Mash.Distance.1000.: Factor w/ 16 levels "0","0,0348505",..: 7 7 7 7 7 7 6 6 6 6 ...
+    # $ A..1000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
+    # $ N..1000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
     # $ Mash.Pv..10000.     : Factor w/ 25 levels "0","0,0148949",..: 1 1 1 1 1 1 1 1 1 1 ...
     # $ Mash.Distance.10000.: Factor w/ 16 levels "0","0,0348505",..: 7 7 7 7 7 7 6 6 6 6 ...
     # $ A..10000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
     # $ N..10000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
+    # $ Mash.Pv..100000.     : Factor w/ 25 levels "0","0,0148949",..: 1 1 1 1 1 1 1 1 1 1 ...
+    # $ Mash.Distance.100000.: Factor w/ 16 levels "0","0,0348505",..: 7 7 7 7 7 7 6 6 6 6 ...
+    # $ A..100000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
+    # $ N..100000.           : int  136 136 136 136 136 136 10000 10000 10000 10000 ...
     # $ D2                  : Factor w/ 46 levels "0","1,00952E+12",..: 34 33 31 26 25 24 23 19 17 8 ...
     # $ Euclidean           : Factor w/ 42 levels "1.832.067,52",..: 7 24 36 4 5 6 30 38 42 8 ...
     # $ Euclid_norm         : int  0 0 0 0 0 0 0 0 0 0 ...
@@ -156,7 +184,9 @@ if (!file.exists(df1Filename)) {
     for(i in 1:nrow(df)) {
       r <- df[i,]
       for(m in pltMeasures) {
-        nr <- c( sequenceName, m, r[5:12], df[i, m], df[i, "Mash.Pv..10000."])
+        ss <- str_extract(m, '\\d+')
+        pv <- if (is.na(ss)) 0 else df[i, sprintf("Mash.Pv..%s.", ss)]
+        nr <- c( sequenceName, m, r[5:12], df[i, m], pv)
         tgtDF[nrow(tgtDF)+1,] <- nr
       }
     }
@@ -195,7 +225,7 @@ for( sequenceName in genomes) {
       geom_line(aes(color = k)) +
       geom_point() +
       #  geom_text(aes(label = round(distance, 5)), size = 3, nudge_y = 0.2, show.legend = FALSE) +
-      facet_grid( rows = vars(k), cols = vars(Measure), labeller = labeller( k = label_both)) + #, scales = "free_y"
+      facet_grid( rows = vars(k), cols = vars(Measure), labeller = labeller(Measure = MeasureLabeller, k = label_value)) + #, scales = "free_y"
       theme_light() + theme(strip.text.x = element_text( size = 8, angle = 0),
                              axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
                              panel.spacing=unit(0.1, "lines"),
@@ -216,8 +246,6 @@ for( sequenceName in genomes) {
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
-
-  # Pannello della density x k *******************************************************************
   #  grafico distanze per ciascuna misura (Theta sull'asse delle x)
   df <- filter(tgtDF, Genome == sequenceName ) # tutte le misure selezionate
   df$Measure <- factor( df$Measure, levels = sortedMeasures)
@@ -226,18 +254,13 @@ for( sequenceName in genomes) {
     geom_line(aes(color = k)) +
     geom_point( size = 0.8) +
     #  geom_text(aes(label = round(distance, 5)), size = 3, nudge_y = 0.2, show.legend = FALSE) +
-    facet_grid( rows = vars(k), cols = vars(Measure), labeller = labeller( k = label_both)) + #, scales = "free_y"
+    facet_grid( rows = vars(k), cols = vars(Measure), labeller = labeller(Measure = MeasureLabeller, k = label_value)) + #, scales = "free_y"
     theme_light() + theme(strip.text.x = element_text( size = 8, angle = 0),
                           axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
                           panel.spacing=unit(0.1, "lines"),
                           legend.position = "none",
                           axis.text.y = element_blank(),
                           axis.title.y = element_blank())
-  # scale_y_continuous(name = "Distance")
-  #                 breaks=c(0, 0.5, 1),
-  #                 labels=c("0", "0.5", "1"))
-  # labs(y = "Distance") +
-  # guides(colour = guide_legend(override.aes = list(size=1)))
 
   # dev.new(width = 6, height = 6)
   outfname <- sprintf( "%s/PanelDistances-%s.pdf", dirname, sequenceName)
@@ -247,7 +270,7 @@ for( sequenceName in genomes) {
 
 
   # grafico delle densità A/N
-  df = filter(tgtDF, Genome == sequenceName & Measure == "Jaccard")
+  df <- filter(tgtDF, Genome == sequenceName & Measure == "Jaccard")
 
   sp1 <- ggplot(data=df, aes(x=Theta, y=density, label=density)) +
     geom_line(aes(color = k)) +
@@ -271,82 +294,30 @@ for( sequenceName in genomes) {
 
 }
 
-
-# grafico delle densità A/N x tutti i genomi
-df <- filter(tgtDF, Genome %in% sortedGenomes, Measure == "Jaccard")
-
-df$Genome <- factor(df$Genome, levels = sortedGenomes)
-
-sp1 <- ggplot(data=df, aes(x=Theta, y=density, label=density)) +
-  geom_line(aes(color = k)) +
-  geom_point() +
-  geom_text(aes(label = round(density, 1)), size = 1.8, nudge_y = 0.2, show.legend = FALSE) +
-  facet_grid( rows = vars(k), cols = vars( Genome), labeller = labeller( k = label_both)) +
-  scale_y_continuous(name = "Genome A/N Values",
-                     breaks=c(0, 0.5, 1),
-                     labels=c("0", "0.5", "1")) +
-  theme_light() + theme( panel.spacing=unit(0.2, "lines"),
-                         legend.position = "none",
-                         strip.text.x = element_text( size = 8, angle = 0),
-                         axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
-                         axis.title.x = element_blank())
-#                         axis.text.x=element_blank())
-
-outfname <- sprintf( "%s/PanelDensities-all.pdf", dirname)
-ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
-dev.off()
-totPrinted <- totPrinted + 1
-
-# grafico delle densità (A+D)/N x tutti i genomi
-df <- filter(tgtDF, Genome %in% sortedGenomes, Measure == "Jaccard")
-
-df$Genome <- factor(df$Genome, levels = sortedGenomes)
-
-sp1 <- ggplot(data=df, aes(x=Theta, y=AD, label=density)) +
-  geom_line(aes(color = k)) +
-  geom_point() +
-  geom_text(aes(label = round(AD, 1)), size = 1.8, nudge_y = 0.2, show.legend = FALSE) +
-  facet_grid( rows = vars(k), cols = vars( Genome), labeller = labeller( k = label_both)) +
-  scale_y_continuous(name = "Genome (A+D)/N Values",
-                     breaks=c(0, 0.5, 1),
-                     labels=c("0", "0.5", "1")) +
-  theme_light() + theme( panel.spacing=unit(0.2, "lines"),
-                         legend.position = "none",
-                         strip.text.x = element_text( size = 8, angle = 0),
-                         axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
-                         axis.title.x = element_blank())
-#                         axis.text.x=element_blank())
-
-outfname <- sprintf( "%s/PanelADN-all.pdf", dirname)
-ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
-dev.off()
-totPrinted <- totPrinted + 1
-
-
 # grafico dei pvalues  x tutti i genomi
-df <- filter(tgtDF, Genome %in% sortedGenomes & Measure == "Mash.Distance.10000.")
-
-df$Genome <- factor(df$Genome, levels = sortedGenomes)
-
-sp1 <- ggplot(data=df, aes(x=Theta, y=pvalue, label=pvalue)) +
-  geom_line(aes(color = k)) +
-  geom_point() +
-  geom_text(aes(label = round(pvalue, 1)), size = 1.8, nudge_y = 0.2, show.legend = FALSE) +
-  facet_grid( rows = vars(k), cols = vars( Genome), labeller = labeller( k = label_both)) +
-  scale_y_continuous(name = "Mash P-Values",
-                     breaks=c(0, 0.5, 1),
-                     labels=c("0", "0.5", "1")) +
-  theme_light() + theme( panel.spacing=unit(0.2, "lines"),
-                         legend.position = "none",
-                         strip.text.x = element_text( size = 8, angle = 0),
-                         axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
-                         axis.title.x = element_blank())
-#                         axis.text.x=element_blank())
-
-outfname <- sprintf( "%s/PanelPValues-all.pdf", dirname)
-ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
-dev.off()
-totPrinted <- totPrinted + 1
+# df <- filter(tgtDF, Genome %in% sortedGenomes & Measure == "Mash.Distance.10000.")
+#
+# df$Genome <- factor(df$Genome, levels = sortedGenomes)
+#
+# sp1 <- ggplot(data=df, aes(x=Theta, y=pvalue, label=pvalue)) +
+#   geom_line(aes(color = k)) +
+#   geom_point() +
+#   geom_text(aes(label = round(pvalue, 1)), size = 1.8, nudge_y = 0.2, show.legend = FALSE) +
+#   facet_grid( rows = vars(k), cols = vars( Genome), labeller = labeller( k = label_both)) +
+#   scale_y_continuous( breaks = c(0, 0.5, 1),
+#                       labels = c("0", "0.5", "1")) +
+#   labs(y = "Mash P-Values (sketch=10.000)") +
+#   theme_light() + theme( panel.spacing=unit(0.2, "lines"),
+#                          legend.position = "none",
+#                          strip.text.x = element_text( size = 8, angle = 0),
+#                          axis.text.x = element_text( size = rel( 0.7), angle = 45, hjust=1),
+#                          axis.title.x = element_blank())
+# #                         axis.text.x=element_blank())
+#
+# outfname <- sprintf( "%s/PanelPValues-all.pdf", dirname)
+# ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
+# dev.off()
+# totPrinted <- totPrinted + 1
 
 # grafico delle distance x tutti i genomi
 sp1 <- ggplot(data=df, aes(x=Theta, y=distance, label=distance)) +
@@ -354,9 +325,9 @@ sp1 <- ggplot(data=df, aes(x=Theta, y=distance, label=distance)) +
   geom_point() +
   geom_text(aes(label = round(distance, 1)), size = 1.8, nudge_y = 0.2, show.legend = FALSE) +
   facet_grid( rows = vars(k), cols = vars( Genome), labeller = labeller( k = label_both)) +
-  scale_y_continuous(name = "Mash Distance",
-                     breaks=c(0, 0.5, 1),
-                     labels=c("0", "0.5", "1")) +
+  scale_y_continuous( breaks = c(0, 0.5, 1),
+                      labels = c("0", "0.5", "1")) +
+  labs(y = "Mash Distance (sketch=10.000)") +
   theme_light() + theme( panel.spacing=unit(0.2, "lines"),
                          legend.position = "none",
                          strip.text.x = element_text( size = 8, angle = 0),

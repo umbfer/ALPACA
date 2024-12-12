@@ -31,7 +31,7 @@ fi
 
 
 # Add script and parameters
-cmd="$cmd Py-Scripts/PySparkPresentAbsent4.py $seqLen $dataDir"
+cmd="$cmd Py-Scripts/PySparkPresentAbsent4.py $seqLen $dataDir $executionMode"
 
 echo $cmd
 # Logging

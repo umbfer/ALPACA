@@ -42,7 +42,7 @@ fi
 spark-submit --class it.unisa.di.bio.DatasetBuilder \
 	     --master $executionMode --deploy-mode client --driver-memory 16g \
 	     --num-executors 4 --executor-memory 27g --executor-cores 7 \
-	     target/PowerStatistics-1.3-SNAPSHOT-jar-with-dependencies.jar \
+	     target/ALPACA-1.0-SNAPSHOT-jar-with-dependencies.jar \
 	     --output $destDir --generator $model  --mode $executionMode\
              --from-len $start --to-len $last --step $step \
              --pairs $numPairs  --geneSize $geneSize \

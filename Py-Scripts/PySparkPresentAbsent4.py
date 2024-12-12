@@ -25,7 +25,7 @@ from pyspark import SparkFiles
 
 # defines the root directory where input datasets and output files are stored (either locally or on HDFS)
 localPrefixPath = '/Users/pipp8/Universita/Src/IdeaProjects/PowerStatistics/data'
-localPrefixPath = './'
+localPrefixPath = '.'
 hdfsPrefixPath = 'hdfs://master2:9000/user/cattaneo/data'
 
 # defines the base name for output files
@@ -738,25 +738,32 @@ def splitPairs(ds):
 def main():
     global hdfsDataDir, hdfsPrefixPath,  outFilePrefix, spark
 
-    use_local_mode = True
-
     argNum = len(sys.argv)
-    if (argNum < 2 or argNum > 3):
+    if (argNum < 3 or argNum > 4):
         """
-            Usage: PySparkPresentAbsent4 seqLength [dataMode]
+            Usage: PySparkPresentAbsent4 seqLength dataDir local|yarn
         """
     else:
         seqLen = int(sys.argv[1])
-        dataMode = sys.argv[2] if (argNum > 2) else ""
+        dataDir = sys.argv[2] if (argNum > 2) else ""
+
+        if sys.argv[3].lower() == "local":
+            use_local_mode = True
+        else:
+            use_local_mode = False
 
         if use_local_mode:
-            dataDir = '%s/%s/len=%d' % (localPrefixPath, dataMode, seqLen)
+            dataDir = '%s/%s/len=%d' % (localPrefixPath, dataDir, seqLen)
             outFile = '%s/%s/%s-%s.%d-%s.csv' % (
-                localPrefixPath, dataMode, outFilePrefix, dataMode, seqLen, dt.today().strftime("%Y%m%d-%H%M"))
+                localPrefixPath, dataDir, outFilePrefix, dataDir, seqLen, dt.today().strftime("%Y%m%d-%H%M"))
+            outFile = '%s.%d-%s.csv' % (dataDir, seqLen, dt.today().strftime("%Y%m%d-%H%M"))
             print("dataDir = %s" % dataDir)
+            print("outFile = %s" % outFile)
+
+            '././data/uniform-32-4/len=100/PresentAbsentData-./data/uniform-32-4/len=100.100-20241211-1929.csv'
         else:
-            dataDir = '%s/%s/len=%d' % (hdfsPrefixPath, dataMode, seqLen)
-            outFile = '%s/%s/%s-%s.%d-%s.csv' % (hdfsPrefixPath, dataMode, outFilePrefix, dataMode, seqLen, dt.today().strftime("%Y%m%d-%H%M"))
+            dataDir = '%s/%s/len=%d' % (hdfsPrefixPath, dataDir, seqLen)
+            outFile = '%s/%s/%s-%s.%d-%s.csv' % (hdfsPrefixPath, dataDir, outFilePrefix, dataDir, seqLen, dt.today().strftime("%Y%m%d-%H%M"))
             print("hdfsDataDir = %s" % hdfsDataDir)
 
 
@@ -775,7 +782,7 @@ def main():
         print(f"Data dir {dataDir} does not exist. Program terminated.")
         exit(-1)
 
-    print("%d workers, dataDir: %s, dataMode: %s" % (nWorkers, dataDir, dataMode))
+    print("%d workers, dataDir: %s, dataMode: %s" % (nWorkers, dataDir, dataDir))
 
 
     if use_local_mode:

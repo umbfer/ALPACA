@@ -8,13 +8,21 @@ We detail the steps necessary to prepare the environment, generate datasets, com
 # Initial Requirements
 
 As a requirement, we are assuming the availability of:
+
 - a _Java_ compliant virtual machine (>= 1.8, [https://adoptopenjdk.net](https://adoptopenjdk.net/)).
-- the _Spark_ framework (>= 3.5.1,[https://spark.apache.org/downloads.html](https://spark.apache.org/downloads.html) ) 
-- a _Python_ interpreter (>= 3.8, [https://python.org/](https://python.org/))
-- the _MAVEN_ framework (>=3.3, [https://maven.apache.org/download.cgi](https://maven.apache.org/download.cgi))
-- the _R_ framework (>=4.1, [https://www.r-project.org/](https://www.r-project.org/))
-- the _KMC_ k-mer counting tool (>=3, [https://github.com/refresh-bio/KMC](https://github.com/refresh-bio/KMC))
-- the _Mash_ distance estimator tool (>=2.3,[https://github.com/marbl/Mash])
+- the _Spark_ framework (>= 3.5.1, [https://spark.apache.org/downloads.html](https://spark.apache.org/downloads.html)).
+- a _Python_ interpreter (>= 3.8, [https://python.org/](https://python.org/)).
+- the _MAVEN_ framework (>= 3.3, [https://maven.apache.org/download.cgi](https://maven.apache.org/download.cgi)).
+- the _R_ framework (>= 4.1, [https://www.r-project.org/](https://www.r-project.org/)), including the following packages:
+  - `DescTools`
+  - `dplyr`
+  - `ggplot2`
+  - `hrbrthemes`
+  - `filelock`
+  - `optparse`
+- the _KMC_ k-mer counting tool (>= 3, [https://github.com/refresh-bio/KMC](https://github.com/refresh-bio/KMC)).
+- the _Mash_ distance estimator tool (>= 2.3, [https://github.com/marbl/Mash](https://github.com/marbl/Mash)).
+
 
 
 Once downloaded and unpacked the archive file, a new directory will be created with name **ALPACA-main**.  In order to build all components needed to execute the experiments, move in this directory and run the command:
@@ -114,6 +122,12 @@ A convenience script, called **runDatasetBuilder.sh**, is available in the  **sc
    - **`local`**: Runs the generator locally.  
    - **`yarn`**: Executes the generator on a Hadoop cluster.
 
+
+The script generates its output in a subdirectory following this format:
+
+**`<model>-<geneSize>-<#pairs>/len=<sequence_length>/`**
+
+
 We advise to modify and use this script, according to the configuration of the Spark cluster being used. In this same script, it is required to provide the name of the existing directory where to save the generated sequences. By default, this script is assumed to be run from the package main directory.
 
 ---
@@ -121,8 +135,12 @@ We advise to modify and use this script, according to the configuration of the S
 ### Example Usage
 
 ```bash
-./runDatasetBuilder.sh uniform 1000 10000 2000 1000 1 32 local
+./scripts/runDatasetBuilder.sh uniform 1000 10000 2000 1000 1 32 local
 ```
+
+Running the aforementioned command line, the output of the script will be saved in the following path:
+
+**`uniform-32-1000/len=1000/`**
 
 Detailed instructions about the datasets to generate are provided by means of a configuration file called **PowerStatistics.properties**, that has to be found in the local directory where the generation script is executed. Details about the options supported by the dataset generator, together with a live example useful to recreate the same type of datasets considered in the paper, is provided in the **PowerStatistics.properties.sample** file available in the **src/main/resources** package directory. We advise to make a copy of this file, to be renamed in 
 **PowerStatistics.properties**, and modify it according to the datasets to be generated.
@@ -159,9 +177,29 @@ A convenience script, called **runPresentAbsent.sh**, is available in the  **scr
 Notice that if `yarn` mode is selected, additional configuration parameters will be used for instrumenting the Hadoop execution. Further information about these parameters can be found in the **runPresentAbsent.sh** file.
 Additionally, the script supports parameters for managing external tools such as `Mash` and `KMC`, allowing users to specify the paths where these tools are installed. Users can also define specific directories for input datasets and output files, providing control over the organization and accessibility of generated results. 
 
-# Step 3: AF present/absent measures summarization
 
-In this step, we first clean and reorganize the output generated in the previous step by producing a single  CSV file containing all AF present/absent measures evaluated during the process.
+Continuing from the previous step, to evaluate AF measures for sequences of length 100 stored in the `uniform-32-4` directory, execute the following command:
+
+### Example Usage
+
+```bash
+./scripts/runPresentAbsent.sh 1000 data/uniform-32-1000 local
+```
+
+Running the aforementioned command, sequences in the len=100 subdirectory will be processed 
+and results for AF measures evaluation will be generated in the specified environment.
+
+After executing the script, the output is stored in the directory:
+
+```plaintext
+data/uniform-32-1000/len=1000.1000-20241212-1200.csv
+```
+where `1000.1000` represents the sequence length and pair count and `20241212-1200` represents the timestamp of the file creation in `YYYYMMDD-HHMM` format.
+  
+# Step 3: AF present/absent measures summarization and analysis
+## Substep 3.1: AF present/absent measures summarization 
+
+In this substep, we first clean and reorganize the output generated in the previous step by producing a single  CSV file containing all AF present/absent measures evaluated during the process.
 
 This is achieved by running either the **`makeCSVReport.sh`** or **`makeCSVReportLocal.sh`** script, depending on the execution mode used in the previous steps:
 
@@ -172,7 +210,7 @@ This is achieved by running either the **`makeCSVReport.sh`** or **`makeCSVRepor
 For the `makeCSVReportLocal.sh` script, use the following syntax:
 
 ```bash
-./makeCSVReportLocal.sh inputDirectory outputFile
+./scripts/makeCSVReportLocal.sh inputDirectory outputFile
 ``` 
 Below is a description of its parameters:
 
@@ -196,73 +234,82 @@ Below is a description of its parameters:
    The path of the CSV file that will be generated as output  
 
 
+### Example Usage
+
+```bash
+./scripts/makeCSVReportLocal.sh data/uniform-32-1000/len=1000.1000-20241212-1200.csv data/PresentAbsentECData-uniform-32-1000.csv
+```
+
+Assuming the output of step 2 has been saved in the **`data/uniform-32-1000/len=1000.1000-20241212-1200.csv`**, running the aforementioned command line, will cause the aggregation of all csv files existing in that directory into a single csv file called 
+
+**`data/PresentAbsentECData-uniform-32-1000.csv`**
 
 
-evaluate the control of Type I error and the power of the test statistic over a set of input AF functions by analyzing the AF values determined in the previous step respectively on the PT and MR alternate models, and on the null distribution, with different values of $k$, $\alpha$, and $\gamma$. Then, we summarize and plot the results of this evaluation on several charts that are automatically saved on disks as graphical images. The whole analysis process takes place in three substeps.
-
-## Powerstatistics evaluation
-In this substep, we evaluate the power statistics of choice on the AF measures determined in the previous step. This is done by running the **it.unisa.di.bio.powerstatistics.PowerEvaluator** class available in the **powerstatistics-1.0-SNAPSHOT.jar** package, using the following syntax:
-
-    java -cp ALPACA-1.0-SNAPSHOT.jar  it.unisa.di.bio.powerstatistics.PowerEvaluator input_directory [MotifReplace|PatternTransfer|Both] syntheticAllLen
 
 
-Here, the first argument reports the directory containing the AF measures evaluated during previous step, encoded as CSV files. The second argument defines which alternate model to consider. The third argument must be set to *syntheticAllLen*.
-As a result, the program will generate, for each AM,  each value of $\alpha$ and of $k$, a separate directory containing a set of JSON files containing the corresponding power statistics.
 
-## Powerstatistics summarization 
-In this substep, we summarize the results available in the JSON files produced in the previous substep, as well as the CSV files containing the AF measures evaluated in the previous step, in a pair of **R** dataframes ready for the analysis.  This is done by running the following command lines, to be executed from the package home directory:
+## Substep 3.2: Powerstatistics evaluation
+In this substep, we evaluate the power statistics and the T1 error, starting from the raw data aggregated during the previous substep.
+This is done by running the following command line:
 
-    R -f R-Scripts/Power+T1-Json2RDS.R
-    R -f R-Scripts/RawDistances-CSV2RDS.R
+```bash
+Rscript R-Scripts/PresentAbsentPower+T1-CSV2RDS-parallel.R --csv path_to_input_csv --df path_to_RDS --trsh path_to_threshold_file
+```
 
-Once run, these two scripts will produce two files, **RawDistances-All.RDS** and **Power+T1-Results.RDS**, used as reference during the next substep related to charts' generation. 
+### Parameters Description
 
-## Powerstatistics charting
-In this substep, data available in files  **RawDistances-All.RDS** and **Power+T1-Results.RDS** is processed and presented by means of several types of charts. In the following we report the list of plotting scripts available with a short description about their expected output:
+1. **`--csv`**:  
+   The input csv file containing the raw AF present/absent measures for evaluation. This file is generated during the previous step.
 
-[//]: # ( - **Plot-T1OnlyPanel.R**:  Shows several different collections of colored boxplots &#40;one for ech distinct value of $k$&#41; reporting the results of the T1 Error Control experiments for each of the considered AF functions &#40;on the abscissa&#41;. The vertical length of each boxplot is proportional to the percentage of false positives. )
+2. **`--df`**:  
+   The output file in RDS format where the data frame containing power statistics and T1 errors will be saved.
 
-[//]: # ( Used to generate **Figure 1** of the main paper, and **Figure 1** of the supplementary material.)
+3. **`--trsh`**:  
+   The path to the csv file containing threshold values for the evaluation.
 
-[//]: # ()
-[//]: # ( - **PlotHammingDistances.R**: Shows a collection of colored boxplots reporting the Hamming Distance of values generated by the Alternative models, with respect to the Null model. On the abscissa, it is shown the generative models considered, with the letter $G$ denoting $\gamma$.)
+### Example usage
 
-[//]: # (Used to generate **Figure 2** of the main paper. )
 
-[//]: # ()
-[//]: # ( -  **Heatmap-Cluster.R**: Creates a heatmap of the delta values obtained as the difference between the average of the distribution of AF values computed with   $NM$ and one of $MR$ and $PT$, with for different combinations of $n$, $k$ and $\gamma$,  reported as colors on the left panel annotation. The dendrogram on the top is a hierarchical clustering  on the delta values with Euclidean distance and complete linkage.)
+```bash
+Rscript R-Scripts/PresentAbsentPower+T1-CSV2RDS-parallel.R --csv data/PresentAbsentECData-uniform-32-1000.csv --df data/PresentAbsentECData-uniform-32-1000.RDS --trsh data/Threshold.csv
+```
 
-[//]: # (Used to generate **Figure 3** of the main paper. )
+Assuming the output of step 3 has been saved in the **`data/`** directory, running the aforementioned command line, 
+will imply the generation of the two files:  **`data/PresentAbsentECData-uniform-32-1000.RDS`** and  **`data/Threshold.csv`**.
 
-[//]: # ()
-[//]: # (- **PlotPanelAllMeasures.R**: Produces two panels reporting the power trend, respectively for the $MR$ and $PT$ alternative models. In each panel, for each AF and $\gamma$ is reported the power level obtained across different values of $n$. It is also colored according to the value of $k$.)
+## Substep 3.2: Powerstatistics Charting
 
-[//]: # (Used to generate **Figure 4** of the main paper. )
+In this substep, power statistics returned by previous subset is processed and presented by means of several types of charts. In the following we report the list of plotting scripts available with a short description about their expected output.
+The available scripts are:
 
-[//]: # ()
-[//]: # ()
-[//]: # (- **PlotRawDistances-AllK.R**: # Produces a panel made of a set of stacked boxplots &#40;one for each distinct value of k&#41;, for each AF.)
-
-[//]: # ( Each boxplot reports the distribution of the proportion of true positives, cumulatively by length, by considering values generated by the Alternative models, with increasing gamma, with respect to $NM$.)
-
-[//]: # (Used to generate **Figure 5** of the main paper. )
-
-[//]: # ()
-[//]: # (- **PlotAllRawDistances.R**: As **PlotOneMeasureRawDistances-AllK.R**, but by considering multiple AF measures at same time.)
-
-[//]: # (Used to generate **Figure 2** and **Figure 3** of the supplementary material. )
-
-[//]: # ()
-[//]: # ( - **PanelBoxplot-Power-AllMeasures.R**: Creates a collection of images, one for each considered Alternative model. In each image it is reported. for each considered AF function and each value of $\gamma$, the power levels obtained across different values of $n$, as a function of $k$.)
-
-[//]: # (Used to generate **Figure 4** of the supplementary material. )
-
+- **PresentAbsentPlot-T1+PanelPower+AN.R**:
+- **PresentAbsentPlotAN.R**:
 
 Each of these scripts can be executed using the following syntax:
 
-> R -f <script name>
+```bash
+Rscript R-Scripts/<script file name> --csv <input CSV file> --df <output RDS file> --dirname <output directory>
+```
 
-Notice that each of these scripts comes with a set of basic options (e.g., changing the input directory, defining the values of $\gamma$ to be considered) that are available in the **Options** section of their initial lines and that can be customized, according to the own's needs, using a text editor. 
+### Parameters
+- **`--csv <input CSV file>`**: Specifies the path to the CSV file containing the input data.  
+  Example: `--csv data/PresentAbsentECData-uniform-32-4.csv`
+
+- **`--df <output RDS file>`**: Defines the path for the RDS file where the processed data will be saved.  
+  Example: `--df data/PresentAbsentECData-uniform-32-4.RDS`
+
+- **`--dirname <output directory>`**: Specifies the directory where output plots will be saved.  
+  Example: `--dirname data`
+
+
+### Example usage
+
+To generate power statistics charts for a dataset using `PresentAbsentPlotAN.R`:
+```bash
+Rscript R-Scripts/PresentAbsentPlotAN.R --csv data/PresentAbsentECData-uniform-32-4.csv --df data/PresentAbsentECData-uniform-32-4.RDS --dirname data
+```
+This will:
+- Read the input data from `data/PresentAbsentECData-uniform-32-1000.csv` and from `data/PresentAbsentECData-uniform-32-4.RDS`. Then, it will generate plots and save them in the `data` directory.
 
 
 

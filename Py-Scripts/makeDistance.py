@@ -19,9 +19,12 @@ def ModifySequence():
 
     if (len(sys.argv) == 3):
         inputFile = sys.argv[1]
-        theta = int(sys.argv[2])
+        #theta = int(sys.argv[2])
+        theta = float(sys.argv[2])
         baseName, ext = os.path.splitext( inputFile)
-        outFile = "%s-%02d%s" % (baseName, theta, ext)
+        #outFile = "%s-%02d%s" % (baseName, theta, ext)
+        outFile = f"{baseName}-T={theta:.3f}{ext}"  # Formattazione del nome del file
+        print(f"Output file: {outFile}")
         MoveAwaySequence(inputFile, outFile, theta)
     else:
         print("Errore nei parametri:\nUsage: %s InputSequence thetaProbability" % os.path.basename(sys.argv[0]))

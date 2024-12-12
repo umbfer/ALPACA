@@ -4,6 +4,7 @@ library(stringr)
 library(RColorBrewer)
 library(ggplot2)
 library(r2r)
+library(optparse)
 
 
 
@@ -23,24 +24,46 @@ library(r2r)
 # csvFilename <- 'PresentAbsentData-all.csv'
 # nullModel <- 'Uniform'
 
-setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
+#setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
 
 
 bs <- "uniform"
 # Sets the name of the file containing the input dataframe
-dfFilename <- sprintf( "%s,32/PresentAbsentEC-Power+T1-%s,32.RDS", bs, bs)
 
+nullModel <- 'Uniform'
+# nullModel <- 'ShuffledEColi'
+T1Model <- paste( sep='', nullModel, '-T1')
+
+
+option_list <- list(
+  make_option(c("-d","--df"), type = "character",
+              help = "Path to the output RDS file", metavar = "character"),
+   make_option(c("--dirname"), type = "character",
+              help = "Directory path for the output plots", metavar = "character")
+
+)
+
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+if (!is.null(opt$df)) {
+    dfFilename <- opt$df
+} else {
+    dfFilename <- sprintf( "%s,32/PresentAbsentEC-Power+T1-%s,32.RDS", bs, bs)
+    dfFilename <- 'uniform,32/PresentAbsentEC-Power+T1-uniform,32.RDS'
+}
+
+if (!is.null(opt$dirname)) {
+  dirname <- opt$dirname
+} else {
 # Sets the output path for the images to be generated
 dirname <- sprintf("%s,32/T1+Power-Plots", bs)
+}
 
 if (!dir.exists(dirname)) {
   dir.create(dirname)
 }
 
-
-nullModel <- 'Uniform'
-# nullModel <- 'ShuffledEColi'
-T1Model <- paste( sep='', nullModel, '-T1')
 
 ###### CODE
 

@@ -2,7 +2,7 @@ library(DescTools)
 library(dplyr)
 library(parallel)
 library(filelock)
-
+library(optparse)
 
 
 
@@ -15,7 +15,7 @@ library(filelock)
 ###### OPTIONS
 
 # Sets the path of the directory containing the output of FADE
-setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
+#setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
 
 bs <- "1"
 bs <- "uniform"
@@ -26,11 +26,36 @@ similarities = c('D2')
 # csvFilename <- 'PresentAbsentData-all.csv'
 # nullModel <- 'Uniform'
 
-dfFilename <- sprintf( "%s,32/PresentAbsentEC-Power+T1-%s,32.RDS", bs, bs)
-csvFilename <- sprintf("%s,32/PresentAbsentECData-%s-32.csv", bs, bs)
-csvFilename <- sprintf("%s,32/PresentAbsentECData-uniform-32-1000.csv", bs)
+option_list <- list(
+  make_option(c("-c","--csv"), type = "character",
+              help = "Path to the CSV file to be read", metavar = "character"),
+  make_option(c("-d","--df"), type = "character",
+              help = "Path to the output RDS file", metavar = "character"),
+  make_option(c("-t", "--trsh"), type = "character",
+              help = "Path to the Thresholds file", metavar = "character")
+)
 
-trsh <- sprintf("%s,32/Thresholds.csv", bs)
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+if (!is.null(opt$csv)) {
+  csvFilename <- opt$csv
+} else {
+  csvFilename <- sprintf("%s,32/PresentAbsentECData-%s-32.csv", bs, bs)
+}
+
+if (!is.null(opt$df)) {
+  dfFilename <- opt$df
+} else {
+  dfFilename <- sprintf("%s,32/PresentAbsentEC-Power+T1-%s,32.RDS", bs, bs)
+}
+
+if (!is.null(opt$trsh)) {
+  trsh <- opt$trsh
+} else {
+  trsh <- sprintf("%s,32/Thresholds.csv", bs)
+}
+
 
 nullModel <- 'Uniform'
 # nullModel <- 'ShuffledEColi'

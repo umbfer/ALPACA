@@ -16,7 +16,7 @@ import time
 import makeDistance as mkd
 
 import numpy as np
-import py_kmc_api as kmc
+
 
 from operator import add
 import pyspark
@@ -26,8 +26,20 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 import pyspark.sql.functions as sf
 
 
-hdfsPrefixPath = 'hdfs://master2:9000/user/cattaneo'
-# hdfsPrefixPath = '/Users/pipp8'
+
+# defines the root directory where input datasets and output files are stored (either locally or on HDFS)
+localPrefixPath = '/Users/pipp8/Universita/Src/IdeaProjects/PowerStatistics/data'
+localPrefixPath = './'
+hdfsPrefixPath = 'hdfs://master2:9000/user/cattaneo/data'
+
+# defines the base name for output files
+outFilePrefix = 'PresentAbsentData'
+
+# define the installation paths of mash and KMC
+MASH_PATH = "/usr/local/bin"
+KMC_PATH = "/Users/umberto/PycharmProjects/KMC/bin"
+
+
 
 hdfsDataDir = ''
 spark = []
@@ -93,13 +105,15 @@ class MashData:
 
 
 def checkPathExists(path: str) -> bool:
-    global hdfsDataDir, spark
-    # spark is a SparkSession
-    sc = spark.sparkContext
-    fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(
-        sc._jvm.java.net.URI.create(hdfsDataDir),
-        sc._jsc.hadoopConfiguration(),)
-    return fs.exists(sc._jvm.org.apache.hadoop.fs.Path(path))
+    global dataDir, spark, use_local_mode
+    if use_local_mode:
+        return os.path.exists(path)
+    else:
+        sc = spark.sparkContext
+        fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(
+            sc._jvm.java.net.URI.create(path),
+            sc._jsc.hadoopConfiguration(),)
+        return fs.exists(sc._jvm.org.apache.hadoop.fs.Path(path))
 
 
 def hamming_distance(seq1: str, seq2: str) -> int:
@@ -279,15 +293,15 @@ def runMash(inputDS1, inputDS2, k):
     mashValues = []
     for i in range(len(sketchSizes)):
         # extract mash sketch from the first sequence
-        cmd = "/usr/local/bin/mash sketch -s %d -k %d %s" % (sketchSizes[i], k, inputDS1)
+        cmd = f"{MASH_PATH}/mash sketch -s {sketchSizes[i]} -k {k} {inputDS1}"
         p = subprocess.Popen(cmd.split())
         p.wait()
 
-        cmd = "/usr/local/bin/mash sketch -s %d -k %d %s" % (sketchSizes[i], k, inputDS2)
+        cmd = f"{MASH_PATH}/mash sketch -s {sketchSizes[i]} -k {k} {inputDS2}"
         p = subprocess.Popen(cmd.split())
         p.wait()
 
-        cmd = "/usr/local/bin/mash dist %s.msh %s.msh" % (inputDS1, inputDS2)
+        cmd = f"{MASH_PATH}/mash dist {inputDS1}.msh {inputDS2}.msh"
         out = subprocess.check_output(cmd.split())
 
         mashValues.append( MashData( out))
@@ -327,7 +341,7 @@ def loadHistogramOnHDFS(histFile: str, destFile: str):
     # os.remove(tmp) # remove kmc output suffix file
 
     print(f"****** Dumping & Transferring to hdfs {histFile} -> {destFile} ******")
-    cmd1 = f"/usr/local/bin/kmc_dump_x {histFile} stdout | hdfs dfs -put - {destFile}"
+    cmd1 = f"{KMC_PATH}/kmc_dump {histFile} stdout | hdfs dfs -put - {destFile}"
     p = subprocess.run( cmd1, shell=True, stdout=subprocess.PIPE)
 
     os.remove(histFile +'.kmc_pre') # remove kmc output prefix file
@@ -336,6 +350,19 @@ def loadHistogramOnHDFS(histFile: str, destFile: str):
     return
 
 
+# load histogram for both sequences (for counter based measures such as D2)
+# and calculate Entropy of the sequence
+# dest file è la path sull'HDFS già nel formato hdfs://host:port/xxx/yyy
+def loadHistogramOnLocal(histFile: str, destFile: str):
+
+    print(f"****** Dumping histograms to  {destFile} ******")
+    cmd1 = f"{KMC_PATH}/kmc_dump {histFile} {destFile}"
+    p = subprocess.run( cmd1, shell=True, stdout=subprocess.PIPE)
+
+    os.remove(histFile +'.kmc_pre') # remove kmc output prefix file
+    os.remove(histFile +'.kmc_suf') # remove kmc output suffix file
+
+    return
 
 
 
@@ -360,7 +387,7 @@ def extractKmers( inputDataset, k, tempDir, kmcOutputPrefix):
     # -sr<value> - number of threads for 2nd stage
     # -hp - hide percentage progress (default: false)
 
-    cmd = "/usr/local/bin/kmc -b -hp -k%d -m12 -fm -ci0 -cs1048575000 -cx2000000000 %s %s %s" % (k, inputDataset, kmcOutputPrefix, tempDir)
+    cmd = f"{KMC_PATH}/kmc -b -hp -k%d -m12 -fm -ci0 -cs1048575000 -cx2000000000 %s %s %s" % (k, inputDataset, kmcOutputPrefix, tempDir)
 
     print(f"****** (local) Kmer Counting {cmd} ******")
 
@@ -451,20 +478,32 @@ def countBasedMeasures(partData):
 
 # run jaccard on sequence pair ds with kmer of length = k
 def processLocalPair(seqFile1: str, seqFile2: str, k: int, theta: int, tempDir: str):
-    global totDistinctKmerAAcc, totDistinctKmerBAcc, totKmerAAcc, totKmerBAcc, kmerStats
+    global totDistinctKmerAAcc, totDistinctKmerBAcc, totKmerAAcc, totKmerBAcc, kmerStats, use_local_mode, dataDir
 
     start = time.time()
 
     # first locally extract kmer statistics for both sequences
 
     baseSeq1 = Path(seqFile1).stem
+
     kmcOutputPrefixA = f"{tempDir}/{baseSeq1}-k={k}"
-    destFilenameA = f"{hdfsDataDir}/{baseSeq1}-k={k}.txt"
+
+    if use_local_mode:
+        destFilenameA = f"{dataDir}/{baseSeq1}-k={k}.txt"
+    else:
+        destFilenameA = f"{hdfsDataDir}/{baseSeq1}-k={k}.txt"
+
+
     # calcola comunque kmc per avere i valori di totDistinctKmerA, totKmerA
     (totDistinctKmerA, totKmerA) = extractKmers(seqFile1, k, tempDir, kmcOutputPrefixA)
+
+
     if (not checkPathExists(destFilenameA)):
         # load kmers statistics from histogram files (dumping kmc output to hdfs)
-        loadHistogramOnHDFS(kmcOutputPrefixA, destFilenameA)
+        if use_local_mode:
+            loadHistogramOnLocal(kmcOutputPrefixA, destFilenameA)
+        else:
+            loadHistogramOnHDFS(kmcOutputPrefixA, destFilenameA)
     else:
         # altrimenti rimuove solo i file temporanei di KMC e usera' destFilenameA come input
         os.remove(kmcOutputPrefixA+'.kmc_pre')
@@ -472,12 +511,22 @@ def processLocalPair(seqFile1: str, seqFile2: str, k: int, theta: int, tempDir: 
 
     baseSeq2 = Path(seqFile2).stem
     kmcOutputPrefixB = f"{tempDir}/{baseSeq2}-k={k}"
-    destFilenameB = f"{hdfsDataDir}/{baseSeq2}-k={k}.txt"
+
+    if use_local_mode:
+        destFilenameB = f"{dataDir}/{baseSeq1}-k={k}.txt"
+    else:
+        destFilenameB = f"{hdfsDataDir}/{baseSeq1}-k={k}.txt"
+
+
     # calcola comunque kmc per avere i valori di totDistinctKmerB, totKmerB
     (totDistinctKmerB, totKmerB) = extractKmers(seqFile2, k, tempDir, kmcOutputPrefixB)
     if (not checkPathExists(destFilenameB)):
         # load kmers statistics from histogram files (dumping kmc output to hdfs)
-        loadHistogramOnHDFS(kmcOutputPrefixB, destFilenameB)
+        if use_local_mode:
+            loadHistogramOnLocal(kmcOutputPrefixB, destFilenameB)
+        else:
+            loadHistogramOnHDFS(kmcOutputPrefixB, destFilenameB)
+
     else:
         # altrimenti rimuove solo i file temporanei di KMC e usera' destFilenameB come input
         os.remove(kmcOutputPrefixB+'.kmc_pre')
@@ -669,25 +718,31 @@ def processPairs(seqFile1: str, seqFile2: str, theta: int):
 
 
 def main():
-    global hdfsDataDir, hdfsPrefixPath, spark, sc, thetaValue, minK, maxK
-
+    global hdfsDataDir, hdfsPrefixPath, localPrefixPath, dataDir, spark, sc, thetaValue, minK, maxK, use_local_mode
 
     hdfsDataDir = hdfsPrefixPath
 
     argNum = len(sys.argv)
-    if (argNum < 5 or argNum > 6):
+    if (argNum < 6 or argNum > 7):
         """
-            Usage: PySparkPASingleSequenceOutMemory Sequence1 Sequence2 theta dataDir [kValue]
+            Usage: PySparkPASingleSequenceOutMemory Sequence1 Sequence2 theta dataDir yarn|local [kValue]
         """
     else:
         # theta viene utilizzato SOLO se Sequence2 == "synthetic" altrimenti viene ignorato
-        thetaValue = int(sys.argv[3])
+        thetaValue = float(sys.argv[3])*100
+
+
+    if sys.argv[5].lower() == "local":
+        use_local_mode = True
+        dataDir = '%s/%s' % (localPrefixPath, sys.argv[4])
+    else:
+        use_local_mode = False
         hdfsDataDir = '%s/%s' % (hdfsPrefixPath, sys.argv[4])
 
-    if (argNum == 6):
+    if (argNum == 7):
         # use just one k value instead of all values from minK to maxK (step)
-        minK = int(sys.argv[5])
-        maxK = int(sys.argv[5])
+        minK = int(sys.argv[6])
+        maxK = int(sys.argv[6])
 
     seqFile1 = sys.argv[1] # le sequenze sono sul file system locale
     seqFile2 = sys.argv[2] # per eseguire localmente l'estrazione dei k-mers
@@ -708,11 +763,17 @@ def main():
     sc2 = spark._jsc.sc()
     nWorkers =  len([executor.host() for executor in sc2.statusTracker().getExecutorInfos()]) - 1
 
-    if (not checkPathExists( hdfsDataDir)):
-        print(f"****** Data dir: {hdfsDataDir} does not exist. Program terminated. ******")
-        exit( -1)
+    if use_local_mode:
+        if (not checkPathExists( dataDir)):
+            print(f"****** Data dir: {dataDir} does not exist. Program terminated. ******")
+            exit( -1)
+            print(f"****** {nWorkers} workers, hdfsDataDir: {dataDir} ******")
+    else:
+        if (not checkPathExists( hdfsDataDir)):
+            print(f"****** Data dir: {hdfsDataDir} does not exist. Program terminated. ******")
+            exit( -1)
+        print(f"****** {nWorkers} workers, hdfsDataDir: {hdfsDataDir} ******")
 
-    print(f"****** {nWorkers} workers, hdfsDataDir: {hdfsDataDir} ******")
 
     processPairs(seqFile1, seqFile2, thetaValue)
 

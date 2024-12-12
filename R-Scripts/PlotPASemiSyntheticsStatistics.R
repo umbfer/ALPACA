@@ -2,7 +2,7 @@ library(DescTools)
 library(dplyr)
 library(ggplot2)
 library(hrbrthemes)
-
+library(optparse)
 
 
 ###### DESCRIPTION
@@ -30,12 +30,57 @@ plot_labeller <- function(variable, value){
 ###### CODE
 
 # Sets the path of the directory containing the output of FADE
-setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
+#setwd("~/Universita/Src/IdeaProjects/power_statistics/data/PresentAbsent")
 
-bs <- "uniform"
-dirname <- sprintf("%s,32/ReportSynthetics", bs)
-df1Filename <- sprintf("%s/distanceAll.RDS", dirname )
-df2Filename <- sprintf("%s/cvAll.RDS", dirname )
+#bs <- "uniform"
+#dirname <- sprintf("%s,32/ReportSynthetics", bs)
+
+option_list <- list(
+  make_option(c("--dirname"), type = "character",
+              help = "Directory path for the datasets [default: %default]", metavar = "character"),
+  make_option(c("-df1","--dataframe1"), type = "character",
+              help = "Filename of the first dataframe", metavar = "character"),
+  make_option(c("-df2","--dataframe2"), type = "character",
+              help = "Filename of the second dataframe", metavar = "character")
+)
+
+# Parsing degli argomenti
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+
+if (!is.null(opt$dirname)) {
+  dirname <- opt$dirname
+} else {
+# Sets the output path for the images to be generated
+    dirname <- "Datasets2"
+}
+
+
+
+if (!is.null(opt$df1)) {
+  df1Filename <- opt$df1
+} else {
+    df1Filename <- sprintf("%s/distanceAll.RDS", dirname )
+}
+
+if (!is.null(opt$df2)) {
+  df2Filename <- opt$df2
+} else {
+    df2Filename <- sprintf("%s/cvAll.RDS", dirname )
+}
+
+
+
+
+# Defines the name of the file containing a copy of the dataframe created by this script
+#  Yeast, CElegans, HomoSapiens, Schistosoma, Lemur, MacacaMulatta, PiceaAbies
+# genomes <- c( "Yeast", "CElegans", "HomoSapiens", "Schistosoma", "Lemur", "MacacaMulatta", "PiceaAbies")
+genomes <- c( "Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
+sortedGenomes <- c("Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
+
+genomes <- c( "fish")
+sortedGenomes <- c( "fish")
 
 similarities = c('D2')
 # misure di riferimento
@@ -54,11 +99,7 @@ sortedMeasures = c(l1, l2, l3)
 zoomLevels <- c(95, 90, 80, 70, 60) # soglia sul valore di theta per avere 1, 2, 3, 4, 5 valori sull'asse delle x
 zoom <- 5
 
-# Defines the name of the file containing a copy of the dataframe created by this script
-#  Yeast, CElegans, HomoSapiens, Schistosoma, Lemur, MacacaMulatta, PiceaAbies
-# genomes <- c( "Yeast", "CElegans", "HomoSapiens", "Schistosoma", "Lemur", "MacacaMulatta", "PiceaAbies")
-genomes <- c( "Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
-sortedGenomes <- c("Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
+
 
 types <- c("1:3", "4:6", "7:9", "9:11", "4:11", "all")
 elements <- c("1:3", "4:6", "7:9", "9:11", "4:11", "1:11")
@@ -79,8 +120,11 @@ if (!file.exists(df1Filename) || !file.exists(df2Filename) ) {
   cnt = 0
   for( sequenceName in genomes) {
 
-    dfFilename <- sprintf( "%s,32/Synthetics-DatiEsperimento/Report%s.RDS", bs, sequenceName)
-    csvFilename <- sprintf("%s,32/Synthetics-DatiEsperimento/%s.csv", bs, sequenceName)
+#    dfFilename <- sprintf( "%s,32/Datasets2/Report%s.RDS", bs, sequenceName)
+ #   csvFilename <- sprintf("%s,32/Datasets2/%s.csv", bs, sequenceName)
+
+    dfFilename <- sprintf( "Datasets2/Report%s.RDS",  sequenceName)
+    csvFilename <- sprintf("Datasets2/%s.csv", sequenceName)
 
     if (!dir.exists(dirname)) {
       dir.create(dirname)
