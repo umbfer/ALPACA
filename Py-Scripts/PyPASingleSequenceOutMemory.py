@@ -493,7 +493,7 @@ def processLocalPair(seqFile1: str, seqFile2: str, k: int, theta: int, tempDir: 
     else:
         destFilenameA = f"{hdfsDataDir}/{baseSeq1}-k={k}.txt"
 
-
+    print(f'Loading from {seqFile1}')
     # calcola comunque kmc per avere i valori di totDistinctKmerA, totKmerA
     (totDistinctKmerA, totKmerA) = extractKmers(seqFile1, k, tempDir, kmcOutputPrefixA)
 
@@ -517,6 +517,7 @@ def processLocalPair(seqFile1: str, seqFile2: str, k: int, theta: int, tempDir: 
     else:
         destFilenameB = f"{hdfsDataDir}/{baseSeq1}-k={k}.txt"
 
+    print(f'Loading from {seqFile2}')
 
     # calcola comunque kmc per avere i valori di totDistinctKmerB, totKmerB
     (totDistinctKmerB, totKmerB) = extractKmers(seqFile2, k, tempDir, kmcOutputPrefixB)
@@ -746,6 +747,8 @@ def main():
 
     seqFile1 = sys.argv[1] # le sequenze sono sul file system locale
     seqFile2 = sys.argv[2] # per eseguire localmente l'estrazione dei k-mers
+
+
     # outFile = '%s/%s-%s.csv' % (hdfsDataDir, Path( seqFile1).stem, Path(seqFile2).stem )
 
     if (seqFile2 == "synthetic"):

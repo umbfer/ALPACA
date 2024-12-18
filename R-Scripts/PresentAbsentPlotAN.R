@@ -45,7 +45,7 @@ option_list <- list(
               help = "Path to the CSV file to be read", metavar = "character"),
   make_option(c("-d","--df"), type = "character",
               help = "Path to the output RDS file", metavar = "character"),
-   make_option(c("--dirname"), type = "character",
+   make_option(c("--outdir"), type = "character",
               help = "Directory path for the output plots", metavar = "character")
 
 )
@@ -64,8 +64,8 @@ if (!is.null(opt$df)) {
 dfFilename <- 'uniform,32/PresentAbsentEC-Power+T1-uniform,32.RDS'
 }
 
-if (!is.null(opt$dirname)) {
-  dirname <- opt$dirname
+if (!is.null(opt$outdir)) {
+  dirname <- opt$outdir
 } else {
 # Sets the output path for the images to be generated
   dirname <- sprintf("%s,32/T1+Power-Plots", bs)
@@ -121,12 +121,36 @@ if (!file.exists(dfFilename)) {
                 # sequence-B
                 # NKeysB	 2*totalCntB  deltaB	    HkB	      errorB
                 "numeric", "numeric", "numeric", "numeric", "numeric")
+
+  columnClasses = c(
+      # 1  model	   2 gamma	  3 seqLen	 4 pairId	   5 k
+      "character", "numeric", "integer", "integer", "integer",
+      # 6  A	        B	         C	        D	        N
+      "numeric", "numeric", "numeric", "numeric", "numeric",
+      # 15 x misure present absent
+      # 11 Anderberg	Antidice	 Dice	     Gower	    Hamman	  Hamming	   Jaccard	  Kulczynski
+      "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
+      # Matching	 Ochiai	     Phi	     Russel	   Sneath    	Tanimoto	  Yule
+      "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
+      # 26 mash 4 x 3 (P value, Mash distance, A, N)
+      "numeric", "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric", "numeric",
+      # 38 D2,     D2z,      Euclidean, NormalizedEuclidean
+      "numeric", "numeric", "numeric", "numeric",
+      #  dati entropia 5 x seq x 2 (A-B)
+      # sequence-A
+      # 42 NKeysA 2*totalCntA deltaA	   HkA	      errorA
+      "numeric", "numeric", "numeric", "numeric", "numeric",
+      # sequence-B
+      # 47 NKeysB	2*totalCntB deltaB	   HkB	      errorB
+      "numeric", "numeric", "numeric", "numeric", "numeric")
   
   dati <-read.csv(file = csvFilename, colClasses = columnClasses)
+  
   dati$model = factor(dati$model)
   # dati$gamma = factor(dati$gamma)
   # dati$k = factor(dati$k)
-
 
   ll = levels(factor(dati$gamma))
   gValues = as.double(ll[2:length(ll)])
@@ -143,16 +167,25 @@ if (!file.exists(dfFilename)) {
   dati <- readRDS(file = dfFilename)
 }
 
+# for compatibility reasons, we rename the seqLen variable to len
+if ("seqLen" %in% names(dati)) {
+  dati <- dati %>% rename(len = seqLen)
+}
+
+if ("model" %in% names(dati)) {
+  dati <- dati %>% rename(Model = model)
+}
+
 ###### CODE
 altModels = levels(dati$model)[1:2]
 
 alphaValues <- c( 0.01, 0.05, 0.10)
 
 dati$kf = factor(dati$k)
-dati$lf = factor(dati$seqLen)
+dati$lf = factor(dati$len)
 
-NM <- filter(dati, dati$model == nullModel) # tutte le misure per uno specifico AM e valore di alpha
-dff <- filter(dati, dati$model != T1Model & dati$model != nullModel) # tutte le misure per uno specifico AM e valore di alpha
+NM <- filter(dati, dati$Model == nullModel) # tutte le misure per uno specifico AM e valore di alpha
+dff <- filter(dati, dati$Model != T1Model & dati$Model != nullModel) # tutte le misure per uno specifico AM e valore di alpha
 
 NM$gamma <- 0.01
 dff <- rbind( dff, NM)
@@ -161,34 +194,34 @@ dff <- rbind( dff, NM)
 NM$gamma <- 0.10
 dff <- rbind( dff, NM)
 
-md = levels(dff$model)
-dff$model <- factor(dff$model, levels = c( md[3], md[1], md[2])) # riordina le labels
+md = levels(dff$Model)
+dff$Model <- factor(dff$Model, levels = c( md[3], md[1], md[2])) # riordina le labels
 dff$k = factor(dff$k)
 dff$AD = (dff$A+dff$D) / dff$N
 
 # crea un nuovo dataframe per 3 misure per il grafico boxplot delle distanze
-distancesDF <- data.frame(seqLen = numeric(), pairId = numeric(), k = numeric(), gamma = double(), distance = double(),
+distancesDF <- data.frame(len = numeric(), pairId = numeric(), k = numeric(), gamma = double(), distance = double(),
                           model = character(), Measure = character(), stringsAsFactors=TRUE)
 
 pltMeasures = c("D2", "Euclidean", "Jaccard", "Hamman")
 
 # filter model == "Uniform-T1"
-tt <- filter(dati, as.character(dati$model) != "Uniform-T1" ) # tutte le misure per NM, MR e PT
-tt$model <- factor(tt$model, levels = c( md[3], md[1], md[2])) # riordina le labels
-models <- levels(factor(tt$model))
+tt <- filter(dati, as.character(dati$Model) != "Uniform-T1" ) # tutte le misure per NM, MR e PT
+tt$Model <- factor(tt$Model, levels = c( md[3], md[1], md[2])) # riordina le labels
+models <- levels(factor(tt$Model))
 for( m in models ) {
   gammas <- if (as.character(m) == "Uniform") c(0) else c(0.01, 0.05, 0.10)
   for(g in gammas) {
     for (mes in pltMeasures) { # per tutte le misure previste
-      t1 <- filter(tt, tt$model == m & tt$gamma == g ) # tutte le misure per il solo NM
-      df1 <- data.frame( t1$seqLen, t1$pairId, t1$k, t1$gamma, t1[[mes]])
-      colnames(df1)[1] <- "seqLen"
+      t1 <- filter(tt, tt$Model == m & tt$gamma == g ) # tutte le misure per il solo NM
+      df1 <- data.frame( t1$len, t1$pairId, t1$k, t1$gamma, t1[[mes]])
+      colnames(df1)[1] <- "len"
       colnames(df1)[2] <- "pairId"
       colnames(df1)[3] <- "k"
       colnames(df1)[4] <- "gamma"
       colnames(df1)[5] <- "distance"
   
-      df1$model <- switch(as.character(m), "Uniform" = "NM", "MotifRepl-U" = "MR", "PatTransf-U" = "PT")
+      df1$Model <- switch(as.character(m), "Uniform" = "NM", "MotifRepl-U" = "MR", "PatTransf-U" = "PT")
       df1$Measure <- mes
   
       distancesDF <- rbind(distancesDF, df1)
@@ -196,12 +229,12 @@ for( m in models ) {
   }
 }
 
-distancesDF$lf = factor(distancesDF$seqLen)
+distancesDF$lf = factor(distancesDF$len)
 distancesDF$k = factor(distancesDF$k)
-distancesDF$model <- factor(distancesDF$model, levels = c( "NM", "MR", "PT"))# riordina le labels
+distancesDF$Model <- factor(distancesDF$Model, levels = c( "NM", "MR", "PT"))# riordina le labels
 
 sp <- ggplot( dff, aes(x = lf, y = A/N, alpha=0.8)) +
-      geom_boxplot( aes( color = model), alpha = 0.7, outlier.size = 0.3) +
+      geom_boxplot( aes( color = Model), alpha = 0.7, outlier.size = 0.3) +
       facet_grid(cols = vars(gamma), rows = vars(k)) +
       # facet_grid_sc(rows = vars( gamma), scales = 'free') +
       scale_y_continuous(name = "A/N") +
@@ -272,7 +305,7 @@ dev.off() #only 129kb in size
 
 # boxplot con le distanze per il null model
 #
-tt <- filter(distancesDF, as.character(distancesDF$model) == "NM" &
+tt <- filter(distancesDF, as.character(distancesDF$Model) == "NM" &
   distancesDF$Measure != "D2" & distancesDF$Measure != "Euclidean") # tutte le misure Present / Absent
 
 sp <- ggplot( tt, aes(x = lf, y = distance, alpha=0.8)) +
@@ -299,7 +332,7 @@ ggsave( outfname, device = pdf(), width = 6, height = 6, units = "in", dpi = 300
 dev.off() #only 129kb in size
 
 # boxplot con le distanze per il null model solo per D2
-tt <- filter(distancesDF, as.character(distancesDF$model) == "NM" & distancesDF$Measure == "D2") # Solo D2
+tt <- filter(distancesDF, as.character(distancesDF$Model) == "NM" & distancesDF$Measure == "D2") # Solo D2
 sp <- ggplot( tt, aes(x = lf, y = distance, alpha=0.8)) +
   geom_boxplot( aes( color = k), alpha = 0.7, outlier.size = 0.3, width=0.4) +
   facet_grid(cols = vars(Measure), rows = vars(k), scales = "free_y") +
@@ -321,7 +354,7 @@ ggsave( outfname, device = pdf(), width = 3, height = 6, units = "in", dpi = 300
 dev.off() #only 129kb in size
 
 # Panel distanze NM solo per Euclide
-tt <- filter(distancesDF, as.character(model) == "NM" & Measure == "Euclidean") #  Solo Euclide
+tt <- filter(distancesDF, as.character(Model) == "NM" & Measure == "Euclidean") #  Solo Euclide
 sp <- ggplot( tt, aes(x = lf, y = distance, alpha=0.8)) +
   geom_boxplot( aes( color = k), alpha = 0.7, outlier.size = 0.3, width=0.4) +
   facet_grid(cols = vars(Measure), rows = vars(k), scales = "free_y") +
@@ -348,7 +381,7 @@ for(mes in pltMeasures) {
   tt <- filter(distancesDF, distancesDF$Measure == mes) # Solo D2
   sp <- ggplot( tt, aes(x = lf, y = distance, alpha=0.8)) +
     geom_boxplot( aes( color = k), alpha = 0.7, outlier.size = 0.3, width=0.4) +
-    facet_grid(cols = vars(model, gamma), rows = vars(k), scales = "free_y") +
+    facet_grid(cols = vars(Model, gamma), rows = vars(k), scales = "free_y") +
     # scale_y_continuous(name = sprintf("%s distances for each model", mes)) +
     scale_x_discrete(name = NULL, #breaks=c(1000, 10000, 100000, 1000000, 10000000),
                      labels=c("10E3", "10E4", "10E5", "10E6", "10E7")) +

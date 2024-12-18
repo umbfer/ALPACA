@@ -43,12 +43,13 @@ spark = []
 # lengths = range(1000, 50001, 1000) # small dataset
 # gVals = [10, 50, 100]
 nTests = 1000
-nTests = 4
+nTests = 3
 minK = 4
-maxK = 32
 maxK = 8
+maxK = 32
 stepK = 4
 sketchSizes = [1000, 10000, 100000]
+sketchSizes = [100, 1000, 10000]
 
 
 

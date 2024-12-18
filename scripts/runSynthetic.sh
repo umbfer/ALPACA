@@ -19,28 +19,30 @@ baseSeq='GCF_000001405.40_GRCh38.p14_coding-all.fna' # homo-sapiens coding seque
 baseSeq=fish1.fna
 
 
-if (( $# < 3 )) || (( $# > 5 )); then
-    echo "Usage: $0 sequence remoteDataDir local|yarn [theta [k]]"
+if (( $# < 3 )) || (( $# > 6 )); then
+    echo "Usage: $0 sequence remoteDataDir local|yarn [outputFile [theta [k]]]"
     exit 1
 fi
 
 baseSeq=$1
 remoteDataDir=$2
 executionMode=$3
+outputFile=$4
+
+thetaValues='0.005 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 0.95'
+thetaValues='0.005 0.01'
+kValue="4 6"
 
 if [[ $executionMode != "local" && $executionMode != "yarn" ]]; then
     echo "Please specify execution mode as either 'local' or 'yarn'"
     exit -1
 fi
 
-thetaValues='0.005 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 0.95'
-thetaValues='0.005'
-kValue=""
-if (( $# >= 4 )); then
-    thetaValues=$4
+if (( $# >= 5 )); then
+    thetaValues=$5
 fi
-if (( $# == 5 )); then
-    kValue=$5
+if (( $# == 6 )); then
+    kValue=$6
 fi
 
 
@@ -49,8 +51,10 @@ if [[ "$executionMode" == "local" ]]; then
   dataDir=$remoteDataDir
 fi
 
-seq1=${dataDir}/$baseSeq
+echo "Datadir1: $dataDir"
 
+seq1=${dataDir}/$baseSeq
+echo "seq1: $seq1"
 
 logFile="run-$(date '+%s').log"
 echo "Start Log file: $(date)e" > $logFile
@@ -59,7 +63,9 @@ echo "Log file: $logFile"
 for i in $thetaValues ; do
      ${scriptDir}/makeDistance.py  ${seq1} $i
      echo "Theta: $i"
+     echo "Datadir: $dataDir"
     seq2=$(printf "%s/%s-T=%.3f.fna" ${dataDir} $(basename $seq1 .fna) $i)
+    echo "seq12: $seq2"
 
     if [[ "$executionMode" == "yarn" ]]; then
         cmd="spark-submit --master yarn --deploy-mode client --driver-memory $DRIVER_MEMORY \
@@ -107,5 +113,8 @@ else
     echo "$base ok $l"
 fi
 
-final="${dataDir}/${base}-$(date +%s).csv"
-mv "$report" "$final"
+if [[ -z "$outputFile" ]]; then
+    outputFile="${dataDir}/${base}-$(date +%s).csv"
+fi
+
+mv "$report" "$outputFile"

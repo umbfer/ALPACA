@@ -37,11 +37,13 @@ plot_labeller <- function(variable, value){
 
 option_list <- list(
   make_option(c("--dirname"), type = "character",
-              help = "Directory path for the datasets [default: %default]", metavar = "character"),
-  make_option(c("-df1","--dataframe1"), type = "character",
+              help = "Directory path for the input datasets ", metavar = "character"),
+  make_option(c("--dataframe1"), type = "character",
               help = "Filename of the first dataframe", metavar = "character"),
-  make_option(c("-df2","--dataframe2"), type = "character",
-              help = "Filename of the second dataframe", metavar = "character")
+  make_option(c("--dataframe2"), type = "character",
+              help = "Filename of the second dataframe", metavar = "character"),
+  make_option(c("--outdir"), type = "character",
+              help = "Directory where to save the output", metavar = "character")
 )
 
 # Parsing degli argomenti
@@ -56,7 +58,11 @@ if (!is.null(opt$dirname)) {
     dirname <- "Datasets2"
 }
 
-
+if (!is.null(opt$outdir)) {
+  outdir <- opt$outdir
+} else {
+  outdir <- sprintf("%s/%s", dirname, sequenceName)
+}
 
 if (!is.null(opt$df1)) {
   df1Filename <- opt$df1
@@ -71,7 +77,9 @@ if (!is.null(opt$df2)) {
 }
 
 
-
+if (!dir.exists(outdir)) {
+  dir.create(outdir, recursive = TRUE)
+}
 
 # Defines the name of the file containing a copy of the dataframe created by this script
 #  Yeast, CElegans, HomoSapiens, Schistosoma, Lemur, MacacaMulatta, PiceaAbies
@@ -79,8 +87,8 @@ if (!is.null(opt$df2)) {
 genomes <- c( "Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
 sortedGenomes <- c("Yeast", "CElegans", "HomoSapiens", "PiceaAbies")
 
-genomes <- c( "fish")
-sortedGenomes <- c( "fish")
+genomes <- c( "genome1")
+sortedGenomes <- c( "genome1")
 
 similarities = c('D2')
 # misure di riferimento
@@ -123,8 +131,8 @@ if (!file.exists(df1Filename) || !file.exists(df2Filename) ) {
 #    dfFilename <- sprintf( "%s,32/Datasets2/Report%s.RDS", bs, sequenceName)
  #   csvFilename <- sprintf("%s,32/Datasets2/%s.csv", bs, sequenceName)
 
-    dfFilename <- sprintf( "Datasets2/Report%s.RDS",  sequenceName)
-    csvFilename <- sprintf("Datasets2/%s.csv", sequenceName)
+    dfFilename <- sprintf("%s/Report%s.RDS", dirname, sequenceName)
+    csvFilename <- sprintf("%s/%s.csv", dirname, sequenceName)
 
     if (!dir.exists(dirname)) {
       dir.create(dirname)
@@ -155,6 +163,38 @@ if (!file.exists(df1Filename) || !file.exists(df2Filename) ) {
         # NKeysB   totalCntB   deltaB       HkB      errorB
         "numeric", "numeric", "numeric", "numeric","numeric")
 
+       columnClasses <- c(
+  # sequenceA   sequenceB   start time    real time   Theta   k
+  "character", "character", "numeric",   "numeric",  "numeric", "integer",
+  # A           B           C             D           N       A/N
+  "numeric",   "numeric",   "numeric",   "numeric",  "numeric", "numeric",
+  # 15 x misure present/absent
+  # Anderberg   Antidice    Dice          Gower       Hamman  Hamming
+  "numeric",   "numeric",   "numeric",   "numeric",  "numeric", "numeric",
+  # Jaccard     Kulczynski  Matching      Ochiai      Phi     Russel
+  "numeric",   "numeric",   "numeric",   "numeric",  "numeric", "numeric",
+  # Sneath      Tanimoto    Yule
+  "numeric",   "numeric",   "numeric",
+  # Mash metrics (1000)
+  # Mash Pv (1000) Mash Distance(1000)  A (1000)     N (1000)
+  "numeric",      "numeric",           "numeric",   "numeric",
+  # Mash metrics (10000)
+  # Mash Pv (10000) Mash Distance(10000)  A (10000)     N (10000)
+  "numeric",       "numeric",            "numeric",   "numeric",
+  # Mash metrics (100000)
+  # Mash Pv (100000) Mash Distance(100000)  A (100000)     N (100000)
+  "numeric",       "numeric",            "numeric",   "numeric",
+  # D2    D2Z    Euclidean    EuclideanZ
+  "numeric", "numeric", "numeric", "numeric",
+  # sequence-A entropy data
+  # NKeysA    2*totalCntA   deltaA       HkA         errorA
+  "numeric", "numeric",    "numeric",   "numeric",   "numeric",
+  # sequence-B entropy data
+  # NKeysB    2*totalCntB   deltaB       HkB         errorB
+  "numeric", "numeric",    "numeric",   "numeric",   "numeric"
+)
+
+      cat(sprintf("Reading file %s\n", csvFilename))
       df <-read.csv( file = csvFilename, sep = ",", dec = ".", colClasses = columnClasses)
       saveRDS( df, file = dfFilename)
       cat(sprintf("Dataset %s %d rows saved.\n", dfFilename, nrow(df)))
@@ -279,9 +319,12 @@ if (!file.exists(df1Filename) || !file.exists(df2Filename) ) {
       }
     }
 
+
     cnt = cnt + 1
+
     if (nrow(tgtDF) != cnt * dfSize || nrow(df_total) != dfSize)   {
-      stop("errore nel calcolo di df_total per il calcolo delle distanze relative")
+#      stop("errore nel calcolo di df_total per il calcolo delle distanze relative")
+      cat(sprintf("errore nel calcolo di df_total per il calcolo delle distanze relative"))
     }
   } # per ogni genoma
   # salva il df finale
@@ -320,6 +363,13 @@ for( sequenceName in genomes) {
   df = filter(tgtDF, Genome == sequenceName & Measure != "D2" & Measure != "Euclidean")
   df$Measure = factor( df$Measure, levels = sortedMeasures)
 
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
+
+
   sp1 <- ggplot(df, aes(x = Theta, y = distance, fill = k)) +
       geom_line(aes(color = k)) +
       geom_point() +
@@ -340,7 +390,8 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 6)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelDistances-%s.pdf", dirname, sequenceName, sequenceName)
+  #outfname <- sprintf( "%s/%s/PanelDistances-%s.pdf", dirname, sequenceName, sequenceName)
+  outfname <- sprintf("%s/PanelDistances-%s.pdf", outdir, sequenceName)
   ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
@@ -348,6 +399,12 @@ for( sequenceName in genomes) {
 
   # secondo grafico di riferimento per Euclide
   df = filter(tgtDF, Genome == sequenceName & Measure == "Euclidean")
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance)) +
     # geom_bar( width = 0.7, position = "dodge", stat = "identity") +
@@ -369,13 +426,20 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 9)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelEuclid-%s.pdf", dirname, sequenceName, sequenceName)
+#  outfname <- sprintf( "%s/%s/PanelEuclid-%s.pdf", dirname, sequenceName, sequenceName)
+  outfname <- sprintf("%s/PanelEuclid-%s.pdf", outdir, sequenceName)
   ggsave( outfname, device = pdf(), width = 0.9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
   # Terzo grafico di riferimento per simmilarità D2
   df = filter(tgtDF, Genome == sequenceName & Measure == "D2")
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance)) +
     # geom_bar( width = 0.7, position = "dodge", stat = "identity") +
@@ -395,7 +459,8 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 9)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelD2-%s.pdf", dirname, sequenceName, sequenceName)
+  #outfname <- sprintf( "%s/%s/PanelD2-%s.pdf", dirname, sequenceName, sequenceName)
+  outfname <- sprintf("%s/PanelD2-%s.pdf", outdir, sequenceName)
   ggsave( outfname, device = pdf(), width = 1.1, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
@@ -405,6 +470,12 @@ for( sequenceName in genomes) {
   #  grafico distanze per ciascuna misura (Theta sull'asse delle x)
   df = filter(tgtDF, Genome == sequenceName & Measure != "D2" & Measure != "Euclidean")
   df$Measure = factor( df$Measure, levels = sortedMeasures)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance, fill = k)) +
     geom_line(aes(color = k)) +
@@ -424,7 +495,8 @@ for( sequenceName in genomes) {
   # guides(colour = guide_legend(override.aes = list(size=1)))
 
   # dev.new(width = 6, height = 6)
-  outfname <- sprintf( "%s/%s/PanelDistances-%s.pdf", dirname, sequenceName, sequenceName)
+  #outfname <- sprintf( "%s/%s/PanelDistances-%s.pdf", dirname, sequenceName, sequenceName)
+  outfname <- sprintf("%s/PanelDistances-%s.pdf", outdir, sequenceName)
   ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
@@ -432,6 +504,12 @@ for( sequenceName in genomes) {
 
   # grafico delle densità A/N
   df = filter(tgtDF, Genome == sequenceName & Measure == "Jaccard")
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(data=df, aes(x=Theta, y=density, label=density)) +
     geom_line(aes(color = k)) +
@@ -448,7 +526,8 @@ for( sequenceName in genomes) {
                            axis.title.x = element_blank())
   #                         axis.text.x=element_blank())
 
-  outfname <- sprintf( "%s/%s/PanelDensities-%s.pdf", dirname, sequenceName, sequenceName)
+  #outfname <- sprintf( "%s/%s/PanelDensities-%s.pdf", dirname, sequenceName, sequenceName)
+  outfname <- sprintf("%s/PanelDensities-%s.pdf", outdir, sequenceName)
   ggsave( outfname, device = pdf(), width = 6, height = 9, units = "in", dpi = 300)
   dev.off()
   totPrinted <- totPrinted + 1
@@ -459,6 +538,12 @@ for( sequenceName in genomes) {
   #  grafico distanze per ciascuna misura (Theta sull'asse delle x)
   df = filter(tgtDF, Genome == sequenceName & Measure != "D2" & Measure != "Euclidean" & Theta >= zoomLevels[zoom])
   df$Measure = factor( df$Measure, levels = sortedMeasures)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance, fill = k)) +
     geom_line(aes(color = k)) +
@@ -480,13 +565,20 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 6)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelDistances-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  #outfname <- sprintf( "%s/%s/PanelDistances-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  outfname <- sprintf("%s/PanelDistances-%s-zoom%d.pdf", outdir, sequenceName,zoom)
   ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
 
   df = filter(tgtDF, Genome == sequenceName & Measure == "Euclidean" & Theta >= zoomLevels[zoom])
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance)) +
     # geom_bar( width = 0.7, position = "dodge", stat = "identity") +
@@ -508,13 +600,20 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 9)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelEuclid-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  #outfname <- sprintf( "%s/%s/PanelEuclid-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  outfname <- sprintf("%s/PanelDistances-%s-zoom%d.pdf", outdir, sequenceName, zoom)
   ggsave( outfname, device = pdf(), width = 0.9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
 
   df = filter(tgtDF, Genome == sequenceName & Measure == "D2" & Theta >= zoomLevels[zoom])
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Theta, y = distance)) +
     geom_line(aes(color = k)) +
@@ -533,7 +632,8 @@ for( sequenceName in genomes) {
 
   # dev.new(width = 6, height = 9)
   # print(sp1)
-  outfname <- sprintf( "%s/%s/PanelD2-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  #outfname <- sprintf( "%s/%s/PanelD2-%s-zoom%d.pdf", dirname, sequenceName, sequenceName, zoom)
+  outfname <- sprintf("%s/PanelD2-%s-zoom%d.pdf", outdir, sequenceName,zoom)
   ggsave( outfname, device = pdf(), width = 1.1, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
@@ -546,6 +646,12 @@ for( sequenceName in genomes) {
 
 df = filter(cvDF, Measure != "D2" & Measure != "Euclidean" & type == "all")
 df$Measure = factor( df$Measure, levels = sortedMeasures)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
 sp1 <- ggplot(df, aes(x = Genome, y = cv, fill = k)) +
   geom_point(size = 0.8, aes(color = k)) +
@@ -562,7 +668,8 @@ sp1 <- ggplot(df, aes(x = Genome, y = cv, fill = k)) +
   #                    labels=c("0", "0.5", "1")) +
   # labs(y = "CV 1:11")
 
-outfname <- sprintf( "%s/PanelCV-all.pdf", dirname)
+#outfname <- sprintf( "%s/PanelCV-all.pdf", dirname)
+outfname <- sprintf("%s/PanelCV-all.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
 dev.off() # only 129kb in size
 totPrinted <- totPrinted + 1
@@ -570,6 +677,12 @@ totPrinted <- totPrinted + 1
 
 
 df = filter(cvDF, Measure == "Euclidean" & type == "all")
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
 sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
   geom_point(size = 0.8, aes(color = k)) +
@@ -583,13 +696,19 @@ sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
                          axis.text.y = element_blank(),
                          strip.text.y = element_blank())
 
-outfname <- sprintf( "%s/PanelCVEuclid.pdf", dirname)
+#outfname <- sprintf( "%s/PanelCVEuclid.pdf", dirname)
+outfname <- sprintf("%s/PanelCVEuclid.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 0.9, height = 6, units = "in", dpi = 300)
 dev.off() # only 129kb in size
 totPrinted <- totPrinted + 1
 
 df = filter(cvDF, Measure == "D2" & type == "all")
 
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
   geom_point(size = 0.8, aes(color = k)) +
   facet_grid( rows = vars(k), cols = vars(Measure), , labeller = labeller( k = label_both)) +
@@ -603,7 +722,8 @@ sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
 
   labs( y = "Variability Index")
 
-outfname <- sprintf( "%s/PanelCVD2.pdf", dirname)
+#outfname <- sprintf( "%s/PanelCVD2.pdf", dirname)
+outfname <- sprintf("%s/PanelCVD2.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 1.1, height = 6, units = "in", dpi = 300)
 dev.off() # only 129kb in size
 totPrinted <- totPrinted + 1
@@ -613,6 +733,13 @@ totPrinted <- totPrinted + 1
 for( i in 1:5) {
   df = filter(cvDF, Measure != "D2" & Measure != "Euclidean" & type == types[i])
   df$Measure = factor( df$Measure, levels = sortedMeasures)
+
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Genome, y = cv, fill = k)) +
     geom_point(size = 0.8, aes(color = k)) +
@@ -628,12 +755,19 @@ for( i in 1:5) {
     #                    labels=c("0", "0.5", "1")) +
     labs( x = " ", y = sprintf("Variability Index (%s)", elements[i]))
 
-  outfname <- sprintf( "%s/PanelCV-all-zoom%d.pdf", dirname,i)
+  #outfname <- sprintf( "%s/PanelCV-all-zoom%d.pdf", dirname,i)
+  outfname <- sprintf("%s/PanelCV-all-zoom%d.pdf", outdir, i)
   ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
   df = filter(cvDF, Measure == "Euclidean" & type == types[i])
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
     geom_point(size = 0.8, aes(color = k)) +
@@ -647,12 +781,19 @@ for( i in 1:5) {
     #                      strip.text.y = element_blank()) +
     labs( x = " ", y = sprintf("Variability Index (%s)", elements[i]))
 
-  outfname <- sprintf( "%s/PanelCVEuclid-zoom%d.pdf", dirname, i)
+  #outfname <- sprintf( "%s/PanelCVEuclid-zoom%d.pdf", dirname, i)
+  outfname <- sprintf("%s/PanelCVEuclid-zoom%d.pdf", outdir, i)
   ggsave( outfname, device = pdf(), width = 1.1, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
 
   df = filter(cvDF, Measure == "D2" & type == types[i])
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(df, aes(x = Genome, y = cv)) +
     geom_point(size = 0.8, aes(color = k)) +
@@ -665,7 +806,8 @@ for( i in 1:5) {
     #                      strip.text.y = element_blank()) +
     labs( x = " ", y = sprintf("Variability Index (%s)", elements[i]))
 
-  outfname <- sprintf( "%s/PanelCVD2-zoom%d.pdf", dirname,i)
+  #outfname <- sprintf( "%s/PanelCVD2-zoom%d.pdf", dirname,i)
+  outfname <- sprintf("%s/PanelCVD2-zoom%d.pdf", outdir, i)
   ggsave( outfname, device = pdf(), width = 1.1, height = 6, units = "in", dpi = 300)
   dev.off() # only 129kb in size
   totPrinted <- totPrinted + 1
@@ -673,6 +815,12 @@ for( i in 1:5) {
 
 df = filter(cvDF, Measure != "D2" & Measure != "Euclidean" & type != "all" & type != "4:11")
 df$Measure = factor( df$Measure, levels = sortedMeasures)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
 sp1 <- ggplot(df, aes(x = Genome, y = cv, fill = type)) +
   geom_point(size = 0.8, aes(color = type)) +
@@ -688,7 +836,8 @@ sp1 <- ggplot(df, aes(x = Genome, y = cv, fill = type)) +
   #                    labels=c("0", "0.5", "1")) +
   labs( x = " ", y = "Variability Index")
 
-outfname <- sprintf( "%s/PanelCV-all-zoomall.pdf", dirname)
+#outfname <- sprintf( "%s/PanelCV-all-zoomall.pdf", dirname)
+outfname <- sprintf("%s/PanelCV-all-zoomall.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 9, height = 6, units = "in", dpi = 300)
 dev.off() # only 129kb in size
 totPrinted <- totPrinted + 1
@@ -698,6 +847,12 @@ totPrinted <- totPrinted + 1
 df = filter(tgtDF, Genome %in% sortedGenomes, Measure == "Jaccard")
 
 df$Genome <- factor(df$Genome, levels = sortedGenomes)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
 sp1 <- ggplot(data=df, aes(x=Theta, y=density, label=density)) +
   geom_line(aes(color = k)) +
@@ -714,7 +869,8 @@ sp1 <- ggplot(data=df, aes(x=Theta, y=density, label=density)) +
                          axis.title.x = element_blank())
 #                         axis.text.x=element_blank())
 
-outfname <- sprintf( "%s/PanelDensities-all.pdf", dirname)
+#outfname <- sprintf( "%s/PanelDensities-all.pdf", dirname)
+outfname <- sprintf("%s/PanelDensities-all.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
 dev.off()
 totPrinted <- totPrinted + 1
@@ -723,6 +879,12 @@ totPrinted <- totPrinted + 1
 df = filter(tgtDF, Genome %in% sortedGenomes, Measure == "Jaccard")
 
 df$Genome <- factor(df$Genome, levels = sortedGenomes)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
 sp1 <- ggplot(data=df, aes(x=Theta, y=AD, label=density)) +
   geom_line(aes(color = k)) +
@@ -739,7 +901,8 @@ sp1 <- ggplot(data=df, aes(x=Theta, y=AD, label=density)) +
                          axis.title.x = element_blank())
 #                         axis.text.x=element_blank())
 
-outfname <- sprintf( "%s/PanelRari-all.pdf", dirname)
+#outfname <- sprintf( "%s/PanelRari-all.pdf", dirname)
+outfname <- sprintf("%s/PanelRari-all.pdf", outdir)
 ggsave( outfname, device = pdf(), width = 6, height = 7, units = "in", dpi = 300)
 dev.off()
 totPrinted <- totPrinted + 1
@@ -749,6 +912,12 @@ for( gen in sortedGenomes) {
   df <- filter(tgtDF, Genome == gen & Measure == "Euclidean")
 
   df$Genome <- factor(df$Genome, levels = sortedGenomes)
+
+if (nrow(df) == 0) {
+      warning(sprintf("Dataset vuoto per il grafico: Measure=%s, k=%s",
+                      toString(unique(df$Measure)), toString(unique(df$k))))
+      next
+}
 
   sp1 <- ggplot(data=df, aes(x=Theta, y=distance)) +
     geom_line(aes(color = k)) +
@@ -764,7 +933,8 @@ for( gen in sortedGenomes) {
                            axis.text.y = element_blank(),
                            strip.text.y = if (gen == "PiceaAbies") element_text( size = 8, angle = -90) else element_blank())
 
-  outfname <- sprintf( "%s/PanelDistancesEuclidean-%s.pdf", dirname, gen)
+  #outfname <- sprintf( "%s/PanelDistancesEuclidean-%s.pdf", dirname, gen)
+  outfname <- sprintf("%s/PanelDistancesEuclidean-%s.pdf", outdir, gen)
   ggsave( outfname, device = pdf(), width = 2, height = 6, units = "in", dpi = 300)
   dev.off()
   totPrinted <- totPrinted + 1

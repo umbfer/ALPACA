@@ -38,7 +38,7 @@ T1Model <- paste( sep='', nullModel, '-T1')
 option_list <- list(
   make_option(c("-d","--df"), type = "character",
               help = "Path to the output RDS file", metavar = "character"),
-   make_option(c("--dirname"), type = "character",
+   make_option(c("--outdir"), type = "character",
               help = "Directory path for the output plots", metavar = "character")
 
 )
@@ -53,8 +53,8 @@ if (!is.null(opt$df)) {
     dfFilename <- 'uniform,32/PresentAbsentEC-Power+T1-uniform,32.RDS'
 }
 
-if (!is.null(opt$dirname)) {
-  dirname <- opt$dirname
+if (!is.null(opt$outdir)) {
+  dirname <- opt$outdir
 } else {
 # Sets the output path for the images to be generated
 dirname <- sprintf("%s,32/T1+Power-Plots", bs)
@@ -219,7 +219,7 @@ for( a in c( 0.01, 0.05, 0.10)) { # alpha values
   sp <- ggplot( dff, aes( x = len, y = T1, alpha=0.8)) +
     geom_point( aes( color = k), alpha = 0.8, size = 1.1) +
     scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                  labels=c("10E3", "", "10E5", "", "10+E7"), limits = c(1000, 10000000)) +
+                  labels=c("10E3", "", "10E5", "", "10+E7"), limits = c(min(dff$len), max(dff$len))) +
     scale_y_continuous(name = "T1 Error", limits = c(0, MaxT1)) +
     geom_hline(yintercept = a, linetype="dashed", color = "black") +
     facet_grid( rows = vars( k), cols = vars( Measure),  labeller = plot_labeller) +
@@ -268,7 +268,7 @@ for (gammaTgt in gammaValues) {
       sp <- ggplot( dff, aes( x = len, y = power, alpha=0.8)) +
         geom_point( aes( color = k), alpha = 0.8, size = 1.1) +
         scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                           labels=c("10E3", "", "10E5", "", "10E7"), limits = c(1000, 10000000)) +
+                           labels=c("10E3", "", "10E5", "", "10E7"), limits = c(min(dff$len), max(dff$len))) +
         scale_y_continuous(name = "Power", limits = c(0, 1), labels=c("0", "0.5", "1"), breaks = c(0, 0.5, 1)) +
         facet_grid( rows = vars( k), cols = vars( Measure),  labeller = plot_labeller) +
         theme_bw() + theme(strip.text.x = element_text( size = 8, angle = 70),
@@ -304,7 +304,7 @@ for (alphaTgt in alphaValues) {
     sp <- ggplot( dff, aes( x = len, y = power, alpha=0.8)) +
       geom_point( aes( color = k), alpha = 0.8, size = 1.1) +
       scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                    labels=c("10E3", "", "10E5", "", "10E7"), limits = c(1000, 10000000)) +
+                    labels=c("10E3", "", "10E5", "", "10E7"), limits = c(min(dff$len), max(dff$len))) +
       scale_y_continuous(name = "Power", limits = c(0, 1), labels=c("0", "0.5", "1"), breaks = c(0, 0.5, 1)) +
       facet_grid( rows = vars( k, gamma), cols = vars( Measure),  labeller = plot_labeller) +
       theme_bw() + theme(strip.text.x = element_text( size = 8, angle = 70),
@@ -344,14 +344,14 @@ dff <- filter(df, Measure == "Jaccard" & Model == "MotifRepl-U" & alpha == 0.05 
 # ne restano 5 (len) x 8 (k) = 40 valori
 #
 if (nrow(dff) != 40) {
-  stop("Errore nei dati input")
+  print("Possible error in the input data")
 }
 dff$k <- factor(dff$k)
 
 sp <- ggplot( dff, aes( x = len, y = nmDensity, alpha=0.8)) +
   geom_point( aes( color = k), alpha = 0.8, size = 1.8) +
   scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(1000, 10000000)) +
+                labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(min(dff$len), max(dff$len))) +
   scale_y_continuous(name = "Null Model A/N mean value", limits = c(0, 1), labels=c("0", "0.5", "1"), breaks = c(0, 0.5, 1)) +
   facet_grid( rows = vars( k), labeller = plot_labeller) +
   theme_bw() + theme(strip.text.x = element_text( size = 8, angle = 70),
@@ -379,7 +379,7 @@ for (am in levels(factor(df$Model))) {
   # ne restano 5 (len) x 8 (k) x 3 (gamma) = 120 valori
   #
   if (nrow(dff) != 120) {
-    stop("Errore nei dati input")
+    print("Possible error in the input data")
   }
   dff$k <- factor(dff$k)
   yTitle = sprintf("%s Model A/N mean value", am)
@@ -387,7 +387,7 @@ for (am in levels(factor(df$Model))) {
   sp <- ggplot( dff, aes( x = len, y = amDensity, alpha=0.8)) +
     geom_point( aes( color = k), alpha = 0.8, size = 1.8) +
     scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                  labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(1000, 10000000)) +
+                  labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(min(dff$len), max(dff$len))) +
     scale_y_continuous(name = yTitle, limits = c(0, 1), labels=c("0", "0.5", "1"), breaks = c(0, 0.5, 1)) +
     facet_grid( rows = vars( k), cols = vars( gamma), labeller = plot_labeller) +
     theme_bw() + theme(strip.text.x = element_text( size = 10, angle = 00),
@@ -409,7 +409,7 @@ for (am in levels(factor(df$Model))) {
   sp <- ggplot( dff, aes( x = len, y = nmSD, alpha=0.8)) +
     geom_point( aes( color = k), alpha = 0.8, size = 1.8) +
     scale_x_log10(name = NULL, breaks=c(1000, 10000, 100000, 1000000, 10000000),
-                  labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(1000, 10000000)) +
+                  labels=c("10E3", "10E4", "10E5", "10E6", "10E7"), limits = c(min(dff$len), max(dff$len))) +
     scale_y_continuous(name = "Standard Deviation Null Model A/N") +
     facet_grid( rows = vars( k), labeller = plot_labeller, scales = "free_y") +
     theme_bw() + theme(strip.text.x = element_text( size = 10, angle = 00),
