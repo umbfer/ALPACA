@@ -1,7 +1,7 @@
 ﻿
 This document provides a guide to replicate the experiments described in the paper:
 
-> *Present/Absent $k$-mer Alignment-Free Dissimilarity Measures  for Genome Scale Analysis: Statistical Power, False Positives Control  and Combinatorial Limits*
+> *Density/Sparsity of Common \kmer in Sequences and Their Effect on Present/Absent Alignment-Free Dissimilarity Functions: A Genome Scale Analysiss*
 
 We detail the steps necessary to prepare the environment, generate datasets, compute alignment-free (AF) measures, and analyze results. 
 
